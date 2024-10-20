@@ -2,10 +2,11 @@ import pandas as pd
 import numpy as np
 import os
 import joblib
+import torch
 
 def convert_and_filter_dataframes(
     dataset_list, 
-    desired_columns=[0, 1, 5, 8, 9], 
+    desired_columns=[0, 1, 4, 8, 9], 
     column_names=['x', 'y', 'sdf', 'v_x', 'v_y']
 ):
     """
@@ -14,7 +15,7 @@ def convert_and_filter_dataframes(
 
     Parameters:
         dataset_list (list): A list where each element is a NumPy array or 2D numerical data.
-        desired_columns (list): List of column indices to keep. Default is [0, 1, 5, 8, 9].
+        desired_columns (list): List of column indices to keep. Default is [0, 1, 4, 8, 9].
         column_names (list): List of names to assign to the filtered columns. 
                              Default is ['x', 'y', 'sdf', 'v_x', 'v_y'].
 
@@ -66,7 +67,7 @@ def save_dataframes_as_bytes(dataframes, directory='./processed_data/'):
             # Save each DataFrame as a joblib file
             file_path = os.path.join(directory, f'df_{i}.joblib')
             joblib.dump(df, file_path)
-            print(f"Saved DataFrame {i + 1} to {file_path}.")
+            
         except Exception as e:
             print(f"Error saving DataFrame {i + 1}: {e}")
 
@@ -105,7 +106,7 @@ def load_dataframes_in_batches(directory='./processed_data/', batch_size=10):
             except Exception as e:
                 print(f"Error loading {f}: {e}")
 
-        print(f"Loaded batch {i // batch_size + 1} with {len(batch)} DataFrames.")
+        
         yield batch
 
 def load_dataframes_in_batches_and_collect(directory='./processed_data/', batch_size=10):
@@ -126,4 +127,37 @@ def load_dataframes_in_batches_and_collect(directory='./processed_data/', batch_
 
     print(f"Total DataFrames loaded: {len(all_dataframes)}")
     return all_dataframes
+
+
+
+
+
+def package_dataframes_for_training(dataframes):
+    """
+    Packages a list of DataFrames into PyTorch tensors for training.
+
+    Parameters:
+        dataframes (list): List of DataFrames, each containing 'x', 'y', 'v_x', 'v_y', 'sdf'.
+
+    Returns:
+        X_tensor (torch.Tensor): Tensor containing the x, y positions (features).
+        Y_tensor (torch.Tensor): Tensor containing v_x, v_y, sdf (targets).
+    """
+    # Initialize lists to store X and Y data
+    X_data = []  # For x, y positions
+    Y_data = []  # For v_x, v_y, and sdf targets
+
+    # Iterate through each DataFrame and extract the relevant data
+    for df in dataframes:
+        # Extract x, y for X, and v_x, v_y, sdf for Y
+        X_data.extend(df[['x', 'y']].values)
+        Y_data.extend(df[['v_x', 'v_y', 'sdf']].values)
+
+    # Convert lists to PyTorch tensors
+    X_tensor = torch.tensor(X_data, dtype=torch.float32)
+    Y_tensor = torch.tensor(Y_data, dtype=torch.float32)
+
+    print(f"X tensor shape: {X_tensor.shape}, Y tensor shape: {Y_tensor.shape}")
+
+    return X_tensor, Y_tensor
 
