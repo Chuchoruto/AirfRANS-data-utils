@@ -3,7 +3,7 @@ import numpy as np
 import os
 import joblib
 import torch
-
+from torch.utils.data import TensorDataset
 def convert_and_filter_dataframes(
     dataset_list, 
     desired_columns=[0, 1, 4, 8, 9], 
@@ -134,30 +134,33 @@ def load_dataframes_in_batches_and_collect(directory='./processed_data/', batch_
 
 def package_dataframes_for_training(dataframes):
     """
-    Packages a list of DataFrames into PyTorch tensors for training.
+    Packages a list of DataFrames into a TensorDataset for PyTorch training.
 
     Parameters:
-        dataframes (list): List of DataFrames, each containing 'x', 'y', 'v_x', 'v_y', 'sdf'.
+        dataframes (list): List of DataFrames, each containing 'x', 'y', 'v_x', 'v_y', and 'sdf' columns.
 
     Returns:
-        X_tensor (torch.Tensor): Tensor containing the x, y positions (features).
-        Y_tensor (torch.Tensor): Tensor containing v_x, v_y, sdf (targets).
+        TensorDataset: A PyTorch TensorDataset containing input and target tensors.
     """
     # Initialize lists to store X and Y data
-    X_data = []  # For x, y positions
-    Y_data = []  # For v_x, v_y, and sdf targets
+    X_data = []  # For x, y positions (inputs)
+    Y_data = []  # For v_x, v_y, sdf (targets)
 
-    # Iterate through each DataFrame and extract the relevant data
+    # Extract data from each DataFrame
     for df in dataframes:
-        # Extract x, y for X, and v_x, v_y, sdf for Y
+        # Collect the x, y positions into X_data
         X_data.extend(df[['x', 'y']].values)
+
+        # Collect the v_x, v_y, sdf values into Y_data
         Y_data.extend(df[['v_x', 'v_y', 'sdf']].values)
 
     # Convert lists to PyTorch tensors
     X_tensor = torch.tensor(X_data, dtype=torch.float32)
     Y_tensor = torch.tensor(Y_data, dtype=torch.float32)
 
-    print(f"X tensor shape: {X_tensor.shape}, Y tensor shape: {Y_tensor.shape}")
+    # Package the tensors into a TensorDataset
+    dataset = TensorDataset(X_tensor, Y_tensor)
 
-    return X_tensor, Y_tensor
-
+    print(f"Packaged data into TensorDataset with {len(dataset)} samples.")
+    
+    return dataset
