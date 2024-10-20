@@ -1,3 +1,7 @@
 pandas
 numpy
 joblib
+torch
+seaborn
+matplotlib
+airfrans
