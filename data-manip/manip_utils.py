@@ -39,7 +39,7 @@ def convert_and_filter_dataframes(
                 filtered_df.columns = column_names
 
                 dataframes.append(filtered_df)
-                print(f"Converted and filtered dataset {i + 1} with shape {filtered_df.shape}.")
+                
             else:
                 raise ValueError(f"Dataset {i + 1} is not a valid NumPy array.")
         except Exception as e:
