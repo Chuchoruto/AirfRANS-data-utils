@@ -37,7 +37,7 @@ def train_model(dataset, model, epochs=20, batch_size=512, learning_rate=0.001):
     # Create DataLoader with optimizations
     dataloader = DataLoader(
         dataset, batch_size=batch_size, shuffle=True, 
-        num_workers=2, pin_memory=True
+        num_workers=1, pin_memory=True
     )
 
     # Define loss function and optimizer
