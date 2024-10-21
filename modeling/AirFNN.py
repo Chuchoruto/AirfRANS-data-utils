@@ -11,13 +11,13 @@ class AirFNN(nn.Module):
         super(AirFNN, self).__init__()
         # Define the layers of the network
         self.model = nn.Sequential(
-            nn.Linear(2, 64),  # Input: (x, y), Output: 64 hidden units
+            nn.Linear(2, 16),  # Input: (x, y), Output: 64 hidden units
             nn.ReLU(),          # Activation
-            nn.Linear(64, 128), # Hidden layer
+            nn.Linear(16, 16), # Hidden layer
             nn.ReLU(),          # Activation
-            nn.Linear(128, 64), # Hidden layer
+            nn.Linear(16, 16), # Hidden layer
             nn.ReLU(),          # Activation
-            nn.Linear(64, 3)    # Output: (v_x, v_y, sdf)
+            nn.Linear(16, 3)    # Output: (v_x, v_y, sdf)
         )
     def forward(self, x):
         return self.model(x)
