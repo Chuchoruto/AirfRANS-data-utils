@@ -186,7 +186,7 @@ def package_dataframes_for_training(dataframes, chunk_size=10000, output_dir='./
             chunk_count += 1
             total_samples += len(X_data)
 
-        print(f"Processed DataFrame {i+1}/{len(dataframes)}, Total samples: {total_samples}")
+        
         del df  # Free up memory
         
     print(f"Packaged data into {chunk_count} chunks with {total_samples} total samples.")
