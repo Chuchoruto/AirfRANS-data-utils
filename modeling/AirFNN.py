@@ -72,7 +72,6 @@ def train_model(X_tensor, Y_tensor, model, epochs=20, batch_size=64, learning_ra
 
             total_loss += loss.item()
 
-            print("Batch complete")
 
         # Print the average loss for the epoch
         print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / (X_tensor.size(0) / batch_size):.4f}")
