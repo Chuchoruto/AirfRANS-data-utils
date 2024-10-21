@@ -15,8 +15,6 @@ class AirFNN(nn.Module):
             nn.ReLU(),          # Activation
             nn.Linear(16, 16), # Hidden layer
             nn.ReLU(),          # Activation
-            nn.Linear(16, 16), # Hidden layer
-            nn.ReLU(),          # Activation
             nn.Linear(16, 3)    # Output: (v_x, v_y, sdf)
         )
     def forward(self, x):
