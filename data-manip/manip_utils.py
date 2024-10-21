@@ -132,23 +132,46 @@ def load_dataframes_in_batches_and_collect(directory='./processed_data/', batch_
 
 
 
-def package_dataframes_for_training(dataframes, chunk_size=10000):
+class ChunkedDataset(Dataset):
+    def __init__(self, directory, chunk_prefix):
+        self.directory = directory
+        self.chunk_files = sorted([f for f in os.listdir(directory) if f.startswith(chunk_prefix)])
+        self.chunk_sizes = []
+        self.total_size = 0
+        
+        for file in self.chunk_files:
+            size = os.path.getsize(os.path.join(directory, file))
+            self.chunk_sizes.append(size // (4 * 5))  # Assuming float32 (4 bytes) and 5 columns
+            self.total_size += self.chunk_sizes[-1]
+
+    def __len__(self):
+        return self.total_size
+
+    def __getitem__(self, idx):
+        for i, size in enumerate(self.chunk_sizes):
+            if idx < size:
+                chunk = torch.load(os.path.join(self.directory, self.chunk_files[i]))
+                return chunk[idx]
+            idx -= size
+        raise IndexError("Index out of range")
+
+def package_dataframes_for_training(dataframes, chunk_size=10000, output_dir='./chunked_data'):
     """
-    Packages a list of DataFrames into a ConcatDataset of TensorDatasets for PyTorch training,
-    processing one DataFrame at a time and in chunks to conserve memory.
+    Packages a list of DataFrames into chunks and saves them to disk.
 
     Parameters:
         dataframes (list): List of DataFrames, each containing 'x', 'y', 'v_x', 'v_y', and 'sdf' columns.
         chunk_size (int): Number of rows to process at once within each DataFrame.
+        output_dir (str): Directory to save the chunked data.
 
     Returns:
-        ConcatDataset: A PyTorch ConcatDataset containing multiple TensorDatasets.
+        ChunkedDataset: A custom dataset that loads chunks from disk as needed.
     """
-    datasets = []
+    os.makedirs(output_dir, exist_ok=True)
+    chunk_count = 0
     total_samples = 0
 
     for i, df in enumerate(dataframes):
-        df_datasets = []
         for start in range(0, len(df), chunk_size):
             end = start + chunk_size
             chunk = df.iloc[start:end]
@@ -156,27 +179,14 @@ def package_dataframes_for_training(dataframes, chunk_size=10000):
             X_data = chunk[['x', 'y']].values
             Y_data = chunk[['v_x', 'v_y', 'sdf']].values
 
-            X_tensor = torch.tensor(X_data, dtype=torch.float32)
-            Y_tensor = torch.tensor(Y_data, dtype=torch.float32)
+            combined_data = torch.tensor(np.hstack((X_data, Y_data)), dtype=torch.float32)
 
-            dataset = TensorDataset(X_tensor, Y_tensor)
-            df_datasets.append(dataset)
-
+            torch.save(combined_data, os.path.join(output_dir, f'chunk_{chunk_count}.pt'))
+            chunk_count += 1
             total_samples += len(X_data)
 
-        # Combine chunks of this DataFrame into a single dataset
-        df_dataset = ConcatDataset(df_datasets)
-        datasets.append(df_dataset)
-
         print(f"Processed DataFrame {i+1}/{len(dataframes)}, Total samples: {total_samples}")
-
-        # Free up memory
-        del df_datasets, X_data, Y_data, X_tensor, Y_tensor
-        torch.cuda.empty_cache()  # If using GPU
-
-    # Combine all DataFrame datasets into a single ConcatDataset
-    final_dataset = ConcatDataset(datasets)
-
-    print(f"Packaged data into ConcatDataset with {len(final_dataset)} samples.")
-    
-    return final_dataset
+        del df  # Free up memory
+        
+    print(f"Packaged data into {chunk_count} chunks with {total_samples} total samples.")
+    return ChunkedDataset(output_dir, 'chunk_')

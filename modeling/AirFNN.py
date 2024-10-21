@@ -24,23 +24,26 @@ class AirFNN(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-def train_model(dataset, model, epochs=20, batch_size=64, learning_rate=0.001):
+def train_model(model, dataset_dir, epochs=20, batch_size=64, learning_rate=0.001):
     """
-    Trains the given model on the input and target tensors.
+    Trains the given model on the chunked dataset.
 
     Parameters:
-        X_tensor (torch.Tensor): Input tensor (x, y positions).
-        Y_tensor (torch.Tensor): Target tensor (v_x, v_y, sdf).
         model (nn.Module): PyTorch model to train.
+        dataset_dir (str): Directory containing the chunked dataset.
         epochs (int): Number of training epochs.
         batch_size (int): Batch size for training.
         learning_rate (float): Learning rate for the optimizer.
     """
+    # Create a ChunkedDataset
+    dataset = ChunkedDataset(dataset_dir, chunk_prefix='chunk_')
+
+    # Create a DataLoader
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     print(f"Using device: {device}")
-    # Create DataLoader for batching
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Define loss function and optimizer
     criterion = nn.MSELoss()
@@ -51,15 +54,19 @@ def train_model(dataset, model, epochs=20, batch_size=64, learning_rate=0.001):
         model.train()  # Set the model to training mode
         total_loss = 0
 
-        for X_batch, Y_batch in dataloader:
+        for batch in dataloader:
+            # Separate features and targets
+            X = batch[:, :2].to(device)  # First two columns are x, y
+            y = batch[:, 2:].to(device)  # Last three columns are v_x, v_y, sdf
+
             # Zero the gradients from the previous iteration
             optimizer.zero_grad()
 
             # Forward pass
-            outputs = model(X_batch)
+            outputs = model(X)
 
             # Compute the loss
-            loss = criterion(outputs, Y_batch)
+            loss = criterion(outputs, y)
 
             # Backward pass and optimization step
             loss.backward()
@@ -68,7 +75,8 @@ def train_model(dataset, model, epochs=20, batch_size=64, learning_rate=0.001):
             total_loss += loss.item()
 
         # Print the loss for every epoch
-        print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(dataloader):.4f}")
+        avg_loss = total_loss / len(dataloader)
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}")
 
     print("Training complete!")
 
