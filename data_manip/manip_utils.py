@@ -140,9 +140,10 @@ class ChunkedDataset(Dataset):
         self.total_size = 0
         
         for file in self.chunk_files:
-            size = os.path.getsize(os.path.join(directory, file))
-            self.chunk_sizes.append(size // (4 * 5))  # Assuming float32 (4 bytes) and 5 columns
-            self.total_size += self.chunk_sizes[-1]
+            chunk = torch.load(os.path.join(directory, file))
+            size = len(chunk)
+            self.chunk_sizes.append(size)
+            self.total_size += size
 
     def __len__(self):
         return self.total_size
