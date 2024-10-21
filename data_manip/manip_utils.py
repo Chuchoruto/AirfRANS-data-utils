@@ -159,8 +159,4 @@ def package_dataframes_for_training(dataframes):
     Y_tensor = torch.tensor(Y_data, dtype=torch.float32)
 
     # Package the tensors into a TensorDataset
-    dataset = TensorDataset(X_tensor, Y_tensor)
-
-    print(f"Packaged data into TensorDataset with {len(dataset)} samples.")
-    
-    return dataset
+    return X_tensor, Y_tensor
