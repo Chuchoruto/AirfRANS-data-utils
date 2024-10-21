@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from data_manip.manip_utils import ChunkedDataset
+from ..data_manip.manip_utils import ChunkedDataset
 
 class AirFNN(nn.Module):
     """
