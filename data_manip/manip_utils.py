@@ -3,7 +3,7 @@ import numpy as np
 import os
 import joblib
 import torch
-from torch.utils.data import TensorDataset, ConcatDataset, Dataset
+from torch.utils.data import TensorDataset
 def convert_and_filter_dataframes(
     dataset_list, 
     desired_columns=[0, 1, 4, 8, 9], 
@@ -132,62 +132,35 @@ def load_dataframes_in_batches_and_collect(directory='./processed_data/', batch_
 
 
 
-class ChunkedDataset(Dataset):
-    def __init__(self, directory, chunk_prefix):
-        self.directory = directory
-        self.chunk_files = sorted([f for f in os.listdir(directory) if f.startswith(chunk_prefix)])
-        self.chunk_sizes = []
-        self.total_size = 0
-        
-        for file in self.chunk_files:
-            chunk = torch.load(os.path.join(directory, file))
-            size = len(chunk)
-            self.chunk_sizes.append(size)
-            self.total_size += size
-
-    def __len__(self):
-        return self.total_size
-
-    def __getitem__(self, idx):
-        for i, size in enumerate(self.chunk_sizes):
-            if idx < size:
-                chunk = torch.load(os.path.join(self.directory, self.chunk_files[i]))
-                return chunk[idx]
-            idx -= size
-        raise IndexError("Index out of range")
-
-def package_dataframes_for_training(dataframes, chunk_size=10000, output_dir='./chunked_data'):
+def package_dataframes_for_training(dataframes):
     """
-    Packages a list of DataFrames into chunks and saves them to disk.
+    Packages a list of DataFrames into a TensorDataset for PyTorch training.
 
     Parameters:
         dataframes (list): List of DataFrames, each containing 'x', 'y', 'v_x', 'v_y', and 'sdf' columns.
-        chunk_size (int): Number of rows to process at once within each DataFrame.
-        output_dir (str): Directory to save the chunked data.
 
     Returns:
-        ChunkedDataset: A custom dataset that loads chunks from disk as needed.
+        TensorDataset: A PyTorch TensorDataset containing input and target tensors.
     """
-    os.makedirs(output_dir, exist_ok=True)
-    chunk_count = 0
-    total_samples = 0
+    # Initialize lists to store X and Y data
+    X_data = []  # For x, y positions (inputs)
+    Y_data = []  # For v_x, v_y, sdf (targets)
 
-    for i, df in enumerate(dataframes):
-        for start in range(0, len(df), chunk_size):
-            end = start + chunk_size
-            chunk = df.iloc[start:end]
-            
-            X_data = chunk[['x', 'y']].values
-            Y_data = chunk[['v_x', 'v_y', 'sdf']].values
+    # Extract data from each DataFrame
+    for df in dataframes:
+        # Collect the x, y positions into X_data
+        X_data.extend(df[['x', 'y']].values)
 
-            combined_data = torch.tensor(np.hstack((X_data, Y_data)), dtype=torch.float32)
+        # Collect the v_x, v_y, sdf values into Y_data
+        Y_data.extend(df[['v_x', 'v_y', 'sdf']].values)
 
-            torch.save(combined_data, os.path.join(output_dir, f'chunk_{chunk_count}.pt'))
-            chunk_count += 1
-            total_samples += len(X_data)
+    # Convert lists to PyTorch tensors
+    X_tensor = torch.tensor(X_data, dtype=torch.float32)
+    Y_tensor = torch.tensor(Y_data, dtype=torch.float32)
 
-        
-        del df  # Free up memory
-        
-    print(f"Packaged data into {chunk_count} chunks with {total_samples} total samples.")
-    return ChunkedDataset(output_dir, 'chunk_')
+    # Package the tensors into a TensorDataset
+    dataset = TensorDataset(X_tensor, Y_tensor)
+
+    print(f"Packaged data into TensorDataset with {len(dataset)} samples.")
+    
+    return dataset
