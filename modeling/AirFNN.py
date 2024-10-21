@@ -21,7 +21,7 @@ class AirFNN(nn.Module):
         )
     def forward(self, x):
         return self.model(x)
-def train_model(dataset, model, epochs=20, batch_size=64, learning_rate=0.001):
+def train_model(dataset, model, epochs=20, batch_size=512, learning_rate=0.001):
     """
     Trains the given model on the input and target tensors.
     Parameters:
@@ -35,26 +35,48 @@ def train_model(dataset, model, epochs=20, batch_size=64, learning_rate=0.001):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     print(f"Using device: {device}")
-    # Create DataLoader for batching
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    # Create DataLoader with optimizations
+    dataloader = DataLoader(
+        dataset, batch_size=batch_size, shuffle=True, 
+        num_workers=4, pin_memory=True
+    )
+
     # Define loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Initialize mixed precision scaler
+    scaler = torch.cuda.amp.GradScaler()
+
     # Training loop
     for epoch in range(epochs):
         model.train()  # Set the model to training mode
-        total_loss = 0
+        total_loss = 0.0
+
         for X_batch, Y_batch in dataloader:
+            # Move data to GPU
+            X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
+
             # Zero the gradients from the previous iteration
             optimizer.zero_grad()
-            # Forward pass
-            outputs = model(X_batch)
-            # Compute the loss
-            loss = criterion(outputs, Y_batch)
-            # Backward pass and optimization step
-            loss.backward()
-            optimizer.step()
+
+            # Forward pass with mixed precision
+            with torch.cuda.amp.autocast():
+                outputs = model(X_batch)
+                loss = criterion(outputs, Y_batch)
+
+            # Backward pass with scaling
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
             total_loss += loss.item()
-        # Print the loss for every epoch
+
+        # Print the average loss for the epoch
         print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(dataloader):.4f}")
+
     print("Training complete!")
+
+    
+    
