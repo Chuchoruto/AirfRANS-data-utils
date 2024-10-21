@@ -25,7 +25,7 @@ class AirFNN(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-def train_model(model, dataset_dir, epochs=20, batch_size=64, learning_rate=0.001):
+def train_model(model, dataset_dir, epochs=20, batch_size=16384, learning_rate=0.001):
     """
     Trains the given model on the chunked dataset.
 
