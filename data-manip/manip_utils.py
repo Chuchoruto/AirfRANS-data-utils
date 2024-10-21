@@ -3,7 +3,7 @@ import numpy as np
 import os
 import joblib
 import torch
-from torch.utils.data import TensorDataset
+from torch.utils.data import TensorDataset, ConcatDataset
 def convert_and_filter_dataframes(
     dataset_list, 
     desired_columns=[0, 1, 4, 8, 9], 
@@ -132,35 +132,52 @@ def load_dataframes_in_batches_and_collect(directory='./processed_data/', batch_
 
 
 
-def package_dataframes_for_training(dataframes):
+def package_dataframes_for_training(dataframes, batch_size=1000):
     """
-    Packages a list of DataFrames into a TensorDataset for PyTorch training.
+    Packages a list of DataFrames into a ConcatDataset of TensorDatasets for PyTorch training,
+    processing the data in batches to conserve memory.
 
     Parameters:
         dataframes (list): List of DataFrames, each containing 'x', 'y', 'v_x', 'v_y', and 'sdf' columns.
+        batch_size (int): Number of DataFrames to process in each batch.
 
     Returns:
-        TensorDataset: A PyTorch TensorDataset containing input and target tensors.
+        ConcatDataset: A PyTorch ConcatDataset containing multiple TensorDatasets.
     """
-    # Initialize lists to store X and Y data
-    X_data = []  # For x, y positions (inputs)
-    Y_data = []  # For v_x, v_y, sdf (targets)
+    datasets = []
+    total_samples = 0
 
-    # Extract data from each DataFrame
-    for df in dataframes:
-        # Collect the x, y positions into X_data
-        X_data.extend(df[['x', 'y']].values)
+    for i in range(0, len(dataframes), batch_size):
+        batch_dfs = dataframes[i:i+batch_size]
+        
+        # Initialize lists to store X and Y data for this batch
+        X_data = []
+        Y_data = []
 
-        # Collect the v_x, v_y, sdf values into Y_data
-        Y_data.extend(df[['v_x', 'v_y', 'sdf']].values)
+        # Extract data from each DataFrame in the batch
+        for df in batch_dfs:
+            X_data.extend(df[['x', 'y']].values)
+            Y_data.extend(df[['v_x', 'v_y', 'sdf']].values)
 
-    # Convert lists to PyTorch tensors
-    X_tensor = torch.tensor(X_data, dtype=torch.float32)
-    Y_tensor = torch.tensor(Y_data, dtype=torch.float32)
+        # Convert lists to PyTorch tensors
+        X_tensor = torch.tensor(X_data, dtype=torch.float32)
+        Y_tensor = torch.tensor(Y_data, dtype=torch.float32)
 
-    # Package the tensors into a TensorDataset
-    dataset = TensorDataset(X_tensor, Y_tensor)
+        # Create a TensorDataset for this batch
+        dataset = TensorDataset(X_tensor, Y_tensor)
+        datasets.append(dataset)
 
-    print(f"Packaged data into TensorDataset with {len(dataset)} samples.")
+        total_samples += len(X_data)
+        
+        # Free up memory
+        del X_data, Y_data, X_tensor, Y_tensor
+        torch.cuda.empty_cache()  # If using GPU
+
+        print(f"Processed batch {len(datasets)}, Total samples: {total_samples}")
+
+    # Combine all batches into a single ConcatDataset
+    final_dataset = ConcatDataset(datasets)
+
+    print(f"Packaged data into ConcatDataset with {len(final_dataset)} samples.")
     
-    return dataset
+    return final_dataset
